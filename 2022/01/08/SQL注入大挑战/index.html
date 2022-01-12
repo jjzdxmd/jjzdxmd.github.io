@@ -16,7 +16,7 @@
 <meta property="og:description" content="SQL注入1包含题目： [强网杯2019]随便注  [GXYCTF2019]BabySQli强网杯2019随便注打开题目看到123456array(2) &amp;#123;  [0]&#x3D;&gt;  string(1) &quot;1&quot;  [1]&#x3D;&gt;  string(7) &quot;hahahah&quot;&amp;#125; 似乎是把查询的原始数组返回了。数组的键是列名，值是记录。">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2022-01-08T07:51:16.000Z">
-<meta property="article:modified_time" content="2022-01-10T15:13:41.197Z">
+<meta property="article:modified_time" content="2022-01-12T12:24:05.443Z">
 <meta property="article:author" content="jjzdxmd">
 <meta property="article:tag" content="记录">
 <meta name="twitter:card" content="summary">
@@ -187,6 +187,21 @@
 <p>这里又用了strstr()函数，但该函数不区分大小写，可以大小写绕过。<br>如果这里用了stristr()区分大小写的话，可以尝试用ASCII码来绕过。</p>
 <p>结束！！</p>
 <h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>姿势1：<br>双写，如果用replace函数做过滤的话，可以用双写绕过。replace将寻找字符串中符合条件的部分字符串然后做替换，但不做二次检查。因此可以用双写<br>例如 ununionion seselectlect frfromom</p>
+<br>
+
+<h3 id="GXYCTF2019-BabySQli"><a href="#GXYCTF2019-BabySQli" class="headerlink" title="[GXYCTF2019]BabySQli"></a>[GXYCTF2019]BabySQli</h3><p>打开题目,发现要输入username和password，先都试试admin，返回wrong pass，那么admin这个用户名正确的可能性很大。换其他用户名试试发现是wrong user，可以确定是存在admin这个用户的。</p>
+<p>接下来判断注入点，username加上单引号发现回显报错了，证明这里就是注入点。</p>
+<p>联合注入发现总共有三列，这里要说一下联合查询的结果：<br>当 union 的两个查询的结果列数相同时，union 会把两个查询的结果合并，当查询的结果列数不同时，MySQL会报错：The used SELECT statements have a different number of columns<br>而当两个查询的结果中有字段的值完全一样时，会将结果合并。</p>
+<p>然后就要判断查询的3列中，哪一列是username，哪一列是password<br><br>尝试payload：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select &#x27;admin&#x27; ,2,3# </span><br><span class="line">1&#x27; union select 1,&#x27;admin&#x27;,3#</span><br><span class="line">1&#x27; union select 1,2,&#x27;amdin&#x27;#</span><br></pre></td></tr></table></figure>
+<p>发现只有1’ union select 1,’admin’,3#回显是wrong user，其他都是wrong pass，证明user是第二列，同理pass是第三列。<br>然后就不会了。。。</p>
+<p>跑去看wp，发现是有源码的…</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(xxx[<span class="string">&#x27;password&#x27;</span>])===md5(<span class="variable">$_POST</span>[<span class="string">&#x27;pw&#x27;</span>]))&#123;</span><br><span class="line">	<span class="keyword">echo</span> <span class="variable">$flag</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样的话，可以通过伪造查询结果的方法来绕过，让union的第一个查询为空，而让payload的第3个字段为自定义的md5序列，这样就可以绕过判断。<br>payload：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,&#x27;admin&#x27;,md5(&#x27;1&#x27;)#</span><br></pre></td></tr></table></figure>
+<p>密码是1，登陆后就拿到flag！<br><br>噗,好像还过滤了md5.那就本地跑一个md5序列然后当作字符串传进去算惹。<br>附：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> hashlib</span><br><span class="line"><span class="built_in">str</span> = <span class="string">&#x27;123&#x27;</span></span><br><span class="line">tempstr = <span class="built_in">str</span>.encode(encoding=<span class="string">&#x27;utf-8&#x27;</span>)</span><br><span class="line">m = hashlib.md5()</span><br><span class="line">m.update(tempstr)</span><br><span class="line">b = m.hexdigest()</span><br><span class="line"><span class="built_in">print</span> (b)</span><br></pre></td></tr></table></figure>
+<p>完事儿！！</p>
 
       
 
