@@ -15,11 +15,17 @@
 <meta property="og:site_name" content="jjzdxmd&#39;s Blog">
 <meta property="og:description" content="XSS主要分为反射型、存储型、DOM型。反射型XSS主要是攻击者事先制作好攻击链接, 需要欺骗用户自己去点击链接才能触发XSS代码（服务器中没有这样的页面和内容），一般容易出现在搜索页面。存储型XSS代码是存储在服务器中的，如在个人信息或发表文章等地方，加入代码，如果没有过滤或过滤不严，那么这些代码将储存到服务器中，每当有用户访问该页面的时候都会触发代码执行。通常用来盗取Cookie，来伪造身份。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720162456180.png?raw=true">
+<meta property="og:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163036766.png?raw=true">
+<meta property="og:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163359941.png?raw=true">
+<meta property="og:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163616401.png?raw=true">
+<meta property="og:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720164944346.png?raw=true">
 <meta property="article:published_time" content="2022-07-19T09:29:36.000Z">
-<meta property="article:modified_time" content="2022-07-19T12:48:10.286Z">
+<meta property="article:modified_time" content="2022-07-20T09:03:45.862Z">
 <meta property="article:author" content="jjzdxmd">
 <meta property="article:tag" content="记录">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720162456180.png?raw=true">
   
     <link rel="alternative" href="/atom.xml" title="jjzdxmd&#39;s Blog" type="application/atom+xml">
   
@@ -187,8 +193,21 @@
 
 
 
-
-
+<h4 id="存储型XSS"><a href="#存储型XSS" class="headerlink" title="存储型XSS"></a>存储型XSS</h4><p>存储型XSS指恶意代码存储在服务端比如mongo或者redis中，服务端读取内容到client端时，如果没有做转义或者过滤，client直接把恶意代码当作HTML标签来解析，从而触发恶意代码执行，主要用于盗取Cookie。payload与反射型大体类似，这里主要讲讲防护方法。</p>
+<h5 id="模板渲染时转义"><a href="#模板渲染时转义" class="headerlink" title="模板渲染时转义"></a>模板渲染时转义</h5><p>对HTML模板各处插入点进行充分的转义。<br>常用的模板引擎，ejs、 FreeMarker 、art等，对于HTML转义通常只有一个规则，就是把&amp;&lt;&gt;  “  ‘ / 7这几个字符转义掉，能起到一定的XSS防护作用。可以搭建一个demo来看看。</p>
+<p><img src="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720162456180.png?raw=true"></p>
+<p>上图为nodejs搭建的一个小型demo，从mongo中读取的username的值是我们写入的恶意payload，注意此时我已经把art-template的escape设置为false，即不对特殊字符转义，直接把这条数据发送到客户端看看效果。</p>
+<p><img src="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163036766.png?raw=true"></p>
+<p>payload执行成功。</p>
+<p>当开启escape转义时再看看</p>
+<p><img src="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163359941.png?raw=true"></p>
+<p>很明显看到username的值里面的””做了转义处理，可以看到这里的引号和代码中的引号是不一样的。</p>
+<p><img src="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720163616401.png?raw=true"></p>
+<p>前端渲染时也转义作为普通””处理。</p>
+<p>值得注意的是，模板引擎的转移规则并不完全，注入内联JavaScript、内联JSON的XSS只用简单的转义并不能很好的防护，如下图</p>
+<p><img src="https://github.com/jjzdxmd/src/blob/master/XSS/image-20220720164944346.png?raw=true"></p>
+<p>因此还需要在开发时做更为细致的转义处理</p>
+<h5 id="开启httpOnly"><a href="#开启httpOnly" class="headerlink" title="开启httpOnly"></a>开启httpOnly</h5><p>开启HttpOnly时，可以有效防止恶意代码获取用户cookie，能起到一定效果。对于Http请求走私也有一定的帮助。一般Web框架都默认开启了cookie的httpOnly属性。</p>
 
       
 
